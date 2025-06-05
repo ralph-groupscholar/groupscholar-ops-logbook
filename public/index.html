@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Group Scholar Ops Logbook</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient"></div>
+    <main>
+      <header class="hero">
+        <p class="eyebrow">Group Scholar · Program Operations</p>
+        <h1>Ops Logbook</h1>
+        <p class="lede">
+          Capture incidents, escalations, and operational wins with a shared, searchable
+          logbook. Keep every intervention visible and actionable.
+        </p>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>New Entry</h2>
+          <p>Log a signal with crisp context and immediate next steps.</p>
+        </div>
+        <form id="event-form">
+          <div class="grid">
+            <label>
+              Title
+              <input name="title" placeholder="Scholar outreach delay" required />
+            </label>
+            <label>
+              Category
+              <input name="category" placeholder="Engagement" required />
+            </label>
+            <label>
+              Severity
+              <select name="severity" required>
+                <option value="">Pick severity</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+              </select>
+            </label>
+            <label>
+              Owner
+              <input name="owner" placeholder="Ops Team" required />
+            </label>
+            <label>
+              Status
+              <select name="status" required>
+                <option value="">Pick status</option>
+                <option>Open</option>
+                <option>Monitoring</option>
+                <option>Resolved</option>
+              </select>
+            </label>
+            <label>
+              Occurred (UTC)
+              <input type="datetime-local" name="occurred_at" />
+            </label>
+          </div>
+          <label class="full">
+            Notes
+            <textarea name="notes" rows="3" placeholder="What happened? What did we do?"></textarea>
+          </label>
+          <button type="submit">Add log entry</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Recent Signals</h2>
+          <div class="filters">
+            <select id="status-filter">
+              <option value="">All statuses</option>
+              <option>Open</option>
+              <option>Monitoring</option>
+              <option>Resolved</option>
+            </select>
+            <input id="category-filter" placeholder="Filter category" />
+            <button id="refresh">Refresh</button>
+          </div>
+        </div>
+        <div class="table">
+          <div class="row head">
+            <span>Occurred</span>
+            <span>Signal</span>
+            <span>Category</span>
+            <span>Severity</span>
+            <span>Owner</span>
+            <span>Status</span>
+          </div>
+          <div id="event-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
