@@ -5,6 +5,7 @@ Ops Logbook is a lightweight operations signal tracker for Group Scholar. It hel
 ## Features
 - Log operational signals with severity, owner, and status.
 - Filter recent signals by status or category.
+- Review live summary metrics for status, severity, and ownership trends.
 - Store all activity in a Postgres-backed logbook schema.
 
 ## Tech Stack

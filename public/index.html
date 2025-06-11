@@ -70,6 +70,19 @@
 
       <section class="panel">
         <div class="panel-header">
+          <h2>Signal Pulse</h2>
+          <p>Real-time operational pulse across severity, ownership, and open work.</p>
+        </div>
+        <div id="summary-grid" class="summary-grid"></div>
+        <div class="summary-meta">
+          <div><strong>Top category:</strong> <span id="summary-category">—</span></div>
+          <div><strong>Top owner:</strong> <span id="summary-owner">—</span></div>
+          <div><strong>Latest signal:</strong> <span id="summary-latest">—</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
           <h2>Recent Signals</h2>
           <div class="filters">
             <select id="status-filter">

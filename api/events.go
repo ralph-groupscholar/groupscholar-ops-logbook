@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -35,16 +37,40 @@ type EventInput struct {
 	Notes    string `json:"notes"`
 }
 
+type Summary struct {
+	TotalCount       int        `json:"total_count"`
+	OpenCount        int        `json:"open_count"`
+	MonitoringCount  int        `json:"monitoring_count"`
+	ResolvedCount    int        `json:"resolved_count"`
+	HighCount        int        `json:"high_count"`
+	MediumCount      int        `json:"medium_count"`
+	LowCount         int        `json:"low_count"`
+	TopCategory      string     `json:"top_category"`
+	TopCategoryCount int        `json:"top_category_count"`
+	TopOwner         string     `json:"top_owner"`
+	TopOwnerCount    int        `json:"top_owner_count"`
+	LatestOccurred   *time.Time `json:"latest_occurred,omitempty"`
+	AppliedStatus    string     `json:"applied_status"`
+	AppliedCategory  string     `json:"applied_category"`
+}
+
 var (
 	pool     *pgxpool.Pool
 	poolErr  error
 	poolOnce sync.Once
+
+	errMissingFields     = errors.New("missing required fields")
+	errInvalidOccurredAt = errors.New("invalid occurred_at")
 )
 
 func Handler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		handleList(w, r)
+		if r.URL.Query().Get("view") == "summary" {
+			handleSummary(w, r)
+		} else {
+			handleList(w, r)
+		}
 	case http.MethodPost:
 		handleCreate(w, r)
 	default:
@@ -116,26 +142,18 @@ func handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	input.Title = strings.TrimSpace(input.Title)
-	input.Category = strings.TrimSpace(input.Category)
-	input.Severity = strings.TrimSpace(input.Severity)
-	input.Owner = strings.TrimSpace(input.Owner)
-	input.Status = strings.TrimSpace(input.Status)
-	input.Notes = strings.TrimSpace(input.Notes)
-
-	if input.Title == "" || input.Category == "" || input.Severity == "" || input.Owner == "" || input.Status == "" {
-		http.Error(w, "missing required fields", http.StatusBadRequest)
-		return
-	}
-
-	occurredAt := time.Now().UTC()
-	if input.Occurred != "" {
-		parsed, err := time.Parse(time.RFC3339, input.Occurred)
-		if err != nil {
+	normalized, occurredAt, err := normalizeInput(input)
+	if err != nil {
+		if errors.Is(err, errMissingFields) {
+			http.Error(w, "missing required fields", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, errInvalidOccurredAt) {
 			http.Error(w, "invalid occurred_at", http.StatusBadRequest)
 			return
 		}
-		occurredAt = parsed
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
 	}
 
 	query := `
@@ -145,13 +163,93 @@ func handleCreate(w http.ResponseWriter, r *http.Request) {
 	`
 
 	var e Event
-	if err := db.QueryRow(ctx, query, occurredAt, input.Title, input.Category, input.Severity, input.Owner, input.Status, input.Notes).
+	if err := db.QueryRow(ctx, query, occurredAt, normalized.Title, normalized.Category, normalized.Severity, normalized.Owner, normalized.Status, normalized.Notes).
 		Scan(&e.ID, &e.Occurred, &e.Title, &e.Category, &e.Severity, &e.Owner, &e.Status, &e.Notes, &e.CreatedAt); err != nil {
 		http.Error(w, "failed to create event", http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, e)
+}
+
+func handleSummary(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	db, err := getPool(ctx)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	category := strings.TrimSpace(r.URL.Query().Get("category"))
+
+	summary := Summary{
+		AppliedStatus:   status,
+		AppliedCategory: category,
+	}
+
+	summaryQuery := `
+		select
+			count(*) as total_count,
+			count(*) filter (where status = 'Open') as open_count,
+			count(*) filter (where status = 'Monitoring') as monitoring_count,
+			count(*) filter (where status = 'Resolved') as resolved_count,
+			count(*) filter (where severity = 'High') as high_count,
+			count(*) filter (where severity = 'Medium') as medium_count,
+			count(*) filter (where severity = 'Low') as low_count,
+			max(occurred_at) as latest_occurred
+		from groupscholar_ops_logbook.events
+		where ($1 = '' or status = $1)
+		and ($2 = '' or category = $2)
+	`
+
+	var latest pgtype.Timestamptz
+	if err := db.QueryRow(ctx, summaryQuery, status, category).
+		Scan(&summary.TotalCount, &summary.OpenCount, &summary.MonitoringCount, &summary.ResolvedCount, &summary.HighCount, &summary.MediumCount, &summary.LowCount, &latest); err != nil {
+		http.Error(w, "failed to load summary", http.StatusInternalServerError)
+		return
+	}
+
+	if latest.Valid {
+		t := latest.Time
+		summary.LatestOccurred = &t
+	}
+
+	topCategoryQuery := `
+		select category, count(*) as total
+		from groupscholar_ops_logbook.events
+		where ($1 = '' or status = $1)
+		and ($2 = '' or category = $2)
+		group by category
+		order by total desc
+		limit 1
+	`
+
+	if err := db.QueryRow(ctx, topCategoryQuery, status, category).
+		Scan(&summary.TopCategory, &summary.TopCategoryCount); err != nil && err != pgx.ErrNoRows {
+		http.Error(w, "failed to load summary", http.StatusInternalServerError)
+		return
+	}
+
+	topOwnerQuery := `
+		select owner, count(*) as total
+		from groupscholar_ops_logbook.events
+		where ($1 = '' or status = $1)
+		and ($2 = '' or category = $2)
+		group by owner
+		order by total desc
+		limit 1
+	`
+
+	if err := db.QueryRow(ctx, topOwnerQuery, status, category).
+		Scan(&summary.TopOwner, &summary.TopOwnerCount); err != nil && err != pgx.ErrNoRows {
+		http.Error(w, "failed to load summary", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, summary)
 }
 
 func getPool(ctx context.Context) (*pgxpool.Pool, error) {

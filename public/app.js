@@ -3,6 +3,10 @@ const list = document.getElementById("event-list");
 const statusFilter = document.getElementById("status-filter");
 const categoryFilter = document.getElementById("category-filter");
 const refreshBtn = document.getElementById("refresh");
+const summaryGrid = document.getElementById("summary-grid");
+const summaryCategory = document.getElementById("summary-category");
+const summaryOwner = document.getElementById("summary-owner");
+const summaryLatest = document.getElementById("summary-latest");
 
 const toRFC3339 = (value) => {
   if (!value) return "";
@@ -54,6 +58,40 @@ const renderEvents = (events) => {
   });
 };
 
+const renderSummary = (summary) => {
+  summaryGrid.innerHTML = "";
+
+  const cards = [
+    { label: "Total signals", value: summary.total_count },
+    { label: "Open", value: summary.open_count },
+    { label: "Monitoring", value: summary.monitoring_count },
+    { label: "Resolved", value: summary.resolved_count },
+    { label: "High severity", value: summary.high_count },
+    { label: "Medium severity", value: summary.medium_count },
+    { label: "Low severity", value: summary.low_count },
+  ];
+
+  cards.forEach((card) => {
+    const node = document.createElement("div");
+    node.className = "summary-card";
+    node.innerHTML = `
+      <div class="summary-label">${card.label}</div>
+      <div class="summary-value">${card.value}</div>
+    `;
+    summaryGrid.appendChild(node);
+  });
+
+  summaryCategory.textContent = summary.top_category
+    ? `${summary.top_category} (${summary.top_category_count})`
+    : "—";
+  summaryOwner.textContent = summary.top_owner
+    ? `${summary.top_owner} (${summary.top_owner_count})`
+    : "—";
+  summaryLatest.textContent = summary.latest_occurred
+    ? formatDate(summary.latest_occurred)
+    : "—";
+};
+
 const loadEvents = async () => {
   const params = new URLSearchParams();
   if (statusFilter.value) params.append("status", statusFilter.value);
@@ -62,6 +100,21 @@ const loadEvents = async () => {
   if (!response.ok) return;
   const data = await response.json();
   renderEvents(data);
+};
+
+const loadSummary = async () => {
+  const params = new URLSearchParams();
+  params.append("view", "summary");
+  if (statusFilter.value) params.append("status", statusFilter.value);
+  if (categoryFilter.value) params.append("category", categoryFilter.value.trim());
+  const response = await fetch(`/api/events?${params.toString()}`);
+  if (!response.ok) return;
+  const data = await response.json();
+  renderSummary(data);
+};
+
+const refreshData = async () => {
+  await Promise.all([loadEvents(), loadSummary()]);
 };
 
 form.addEventListener("submit", async (event) => {
@@ -89,14 +142,14 @@ form.addEventListener("submit", async (event) => {
   }
 
   form.reset();
-  await loadEvents();
+  await refreshData();
 });
 
-refreshBtn.addEventListener("click", loadEvents);
-statusFilter.addEventListener("change", loadEvents);
+refreshBtn.addEventListener("click", refreshData);
+statusFilter.addEventListener("change", refreshData);
 categoryFilter.addEventListener("input", () => {
   window.clearTimeout(categoryFilter._debounce);
-  categoryFilter._debounce = window.setTimeout(loadEvents, 400);
+  categoryFilter._debounce = window.setTimeout(refreshData, 400);
 });
 
-loadEvents();
+refreshData();

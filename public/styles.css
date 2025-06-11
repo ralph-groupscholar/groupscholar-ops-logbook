@@ -154,6 +154,42 @@ button:hover {
   gap: 10px;
 }
 
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.summary-card {
+  background: var(--surface-strong);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(15, 27, 31, 0.08);
+  display: grid;
+  gap: 6px;
+}
+
+.summary-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.summary-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.summary-meta {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 .table {
   display: grid;
   gap: 12px;
