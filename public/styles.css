@@ -203,6 +203,15 @@ button:hover {
   border-bottom: 1px solid var(--line);
 }
 
+.event-item .row {
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.event-item .row:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
 .row.head {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -212,6 +221,45 @@ button:hover {
 
 .row span {
   font-size: 0.95rem;
+}
+
+.row-details {
+  display: none;
+  padding: 14px 16px 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  margin-bottom: 12px;
+  gap: 16px;
+}
+
+.event-item.open .row-details {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+}
+
+.detail-block {
+  display: grid;
+  gap: 8px;
+  color: var(--ink);
+}
+
+.detail-block strong {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.detail-block p {
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.detail-meta {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--muted);
 }
 
 .badge {
@@ -252,5 +300,13 @@ button:hover {
 
   .row.head {
     display: none;
+  }
+
+  .event-item .row {
+    padding: 16px 0;
+  }
+
+  .event-item.open .row-details {
+    grid-template-columns: 1fr;
   }
 }

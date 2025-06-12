@@ -32,6 +32,25 @@ const formatDate = (iso) => {
   });
 };
 
+const formatDateLong = (iso) => {
+  if (!iso) return "—";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const createCell = (text) => {
+  const cell = document.createElement("span");
+  cell.textContent = text;
+  return cell;
+};
+
 const renderEvents = (events) => {
   list.innerHTML = "";
 
@@ -44,17 +63,52 @@ const renderEvents = (events) => {
   }
 
   events.forEach((event) => {
+    const item = document.createElement("div");
+    item.className = "event-item";
+
     const row = document.createElement("div");
     row.className = "row";
-    row.innerHTML = `
-      <span>${formatDate(event.occurred_at)}</span>
-      <span>${event.title}</span>
-      <span>${event.category}</span>
-      <span><span class="${badgeClass(event.severity)}">${event.severity}</span></span>
-      <span>${event.owner}</span>
-      <span>${event.status}</span>
-    `;
-    list.appendChild(row);
+    row.appendChild(createCell(formatDate(event.occurred_at)));
+    row.appendChild(createCell(event.title));
+    row.appendChild(createCell(event.category));
+
+    const severityCell = document.createElement("span");
+    const severityBadge = document.createElement("span");
+    severityBadge.className = badgeClass(event.severity);
+    severityBadge.textContent = event.severity;
+    severityCell.appendChild(severityBadge);
+    row.appendChild(severityCell);
+
+    row.appendChild(createCell(event.owner));
+    row.appendChild(createCell(event.status));
+
+    const details = document.createElement("div");
+    details.className = "row-details";
+
+    const notesBlock = document.createElement("div");
+    notesBlock.className = "detail-block";
+    const notesTitle = document.createElement("strong");
+    notesTitle.textContent = "Notes";
+    const notesText = document.createElement("p");
+    notesText.textContent = event.notes || "No notes captured.";
+    notesBlock.appendChild(notesTitle);
+    notesBlock.appendChild(notesText);
+
+    const metaBlock = document.createElement("div");
+    metaBlock.className = "detail-meta";
+    metaBlock.appendChild(createCell(`Occurred: ${formatDateLong(event.occurred_at)}`));
+    metaBlock.appendChild(createCell(`Logged: ${formatDateLong(event.created_at)}`));
+
+    details.appendChild(notesBlock);
+    details.appendChild(metaBlock);
+
+    row.addEventListener("click", () => {
+      item.classList.toggle("open");
+    });
+
+    item.appendChild(row);
+    item.appendChild(details);
+    list.appendChild(item);
   });
 };
 
@@ -74,10 +128,17 @@ const renderSummary = (summary) => {
   cards.forEach((card) => {
     const node = document.createElement("div");
     node.className = "summary-card";
-    node.innerHTML = `
-      <div class="summary-label">${card.label}</div>
-      <div class="summary-value">${card.value}</div>
-    `;
+
+    const label = document.createElement("div");
+    label.className = "summary-label";
+    label.textContent = card.label;
+
+    const value = document.createElement("div");
+    value.className = "summary-value";
+    value.textContent = card.value ?? 0;
+
+    node.appendChild(label);
+    node.appendChild(value);
     summaryGrid.appendChild(node);
   });
 
@@ -88,14 +149,19 @@ const renderSummary = (summary) => {
     ? `${summary.top_owner} (${summary.top_owner_count})`
     : "—";
   summaryLatest.textContent = summary.latest_occurred
-    ? formatDate(summary.latest_occurred)
+    ? formatDateLong(summary.latest_occurred)
     : "—";
 };
 
-const loadEvents = async () => {
+const buildParams = () => {
   const params = new URLSearchParams();
   if (statusFilter.value) params.append("status", statusFilter.value);
   if (categoryFilter.value) params.append("category", categoryFilter.value.trim());
+  return params;
+};
+
+const loadEvents = async () => {
+  const params = buildParams();
   const response = await fetch(`/api/events?${params.toString()}`);
   if (!response.ok) return;
   const data = await response.json();
@@ -103,10 +169,8 @@ const loadEvents = async () => {
 };
 
 const loadSummary = async () => {
-  const params = new URLSearchParams();
+  const params = buildParams();
   params.append("view", "summary");
-  if (statusFilter.value) params.append("status", statusFilter.value);
-  if (categoryFilter.value) params.append("category", categoryFilter.value.trim());
   const response = await fetch(`/api/events?${params.toString()}`);
   if (!response.ok) return;
   const data = await response.json();
